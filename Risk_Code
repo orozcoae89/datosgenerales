@@ -1,0 +1,222 @@
+rm(list=ls())
+library(haven)
+library(epitools)
+salud <- read_sav("F. SALUD.sav")
+laboral <- read_sav("H. MERCADO LABORAL - OCUPADOS.sav")
+salud <- salud[salud$Edad > 18, ]
+salud$id <-
+  paste(
+    salud$Directorio,
+    salud$Nro_encuesta,
+    salud$Secuencia_encuesta,
+    salud$Secuencia_p,
+    salud$Orden
+  )
+laboral$id <-
+  paste(
+    laboral$Directorio,
+    laboral$Nro_encuesta,
+    laboral$Secuencia_encuesta,
+    laboral$Secuencia_p,
+    laboral$Orden
+  )
+perf_demo <- merge(salud, laboral, by.x = "id", by.y = "id")
+perf_demo <-
+  data.frame(
+    perf_demo$id,
+    perf_demo$P128s1,
+    perf_demo$P128s3,
+    perf_demo$P128s4,
+    perf_demo$P128s5,
+    perf_demo$P128s7,
+    perf_demo$P128s8,
+    perf_demo$P128s9,
+    perf_demo$P136,
+    perf_demo$P137,
+    perf_demo$P138,
+    perf_demo$P140,
+    perf_demo$Sexo,
+    perf_demo$Edad,
+    perf_demo$P153
+  )
+variables <-
+  c(
+    "ID",
+    "Asma",
+    "Diabetes",
+    "Hipertensión",
+    "Problemas Cardíacos",
+    "Artritis o Artrosis",
+    "Enfermedad Renal",
+    "Problema cerebrovascular",
+    "Act Física",
+    "¿Ha fumado?",
+    "¿Fuma actualmente?",
+    "¿Consume alcohol?",
+    "Sexo",
+    "Edad",
+    "Ocupación"
+  )
+for (i in 1:length(perf_demo)) {
+  names(perf_demo)[i] = variables[i]
+}
+for (j in 2:8) {
+  perf_demo[, variables[j]] = factor(perf_demo[, variables[j]], labels = c("si", "no"))
+}
+for (j in 10:12) {
+  perf_demo[, variables[j]] = factor(perf_demo[, variables[j]], labels = c("si", "no"))
+}
+perf_demo$Sexo = factor(perf_demo$Sexo, labels = c("hombre", "mujer"))
+perf_demo$Ocupación = factor(
+  perf_demo$Ocupación,
+  labels = c(
+    "Obrero o empleado de empresa particular",
+    "Obrero o empleado del gobierno",
+    "Empleado doméstico",
+    "Profesional independiente",
+    "Trabajador independiente o por cuenta propia",
+    "Patrón o empleado",
+    "Trabajador de finca, tierra o parcela propia en arriendo, ap",
+    "Trabajador sin remuneración",
+    "Jornalero de peón"
+  )
+)
+perf_demo$`Act Física` = factor(
+  perf_demo$`Act Física`,
+  labels = c(
+    "Todos los días",
+    "5 a 6 veces por semana",
+    "3 a 4 veces por semana",
+    "1 a 2 veces por semana",
+    "1 a 3 veces al mes",
+    "Algunas veces al año",
+    "Nunca o casi nunca"
+  )
+)
+for (k in 1:nrow(perf_demo)) {
+  if (perf_demo$Edad[k] <= 24) {
+    perf_demo$Edad[k] <- "18 a 24 años"
+  } else if (perf_demo$Edad[k] >= 25 & perf_demo$Edad[k] <= 40) {
+    perf_demo$Edad[k] <- "25 a 40 años"
+  } else if (perf_demo$Edad[k] >= 41 & perf_demo$Edad[k] <= 65) {
+    perf_demo$Edad[k] <- "41 a 65 años"
+  } else {
+    perf_demo$Edad[k] <- "más de 65 años"
+  }
+}
+
+perf_demo$Edad <- as.factor(perf_demo$Edad)
+str(perf_demo)
+
+perf_demo_enf <- perf_demo[, 2:8]
+
+Genero_enf <- vector("list", 7)
+Edad_enf <- vector("list", 7)
+TipoTrab <- enf <- vector("list", 7)
+ActFis_enf <- vector("list", 7)
+HaFum_enf <- vector("list", 7)
+Alcoh_enf <- vector("list", 7)
+
+for (l in 1:7) {
+  Genero_enf[[l]] <-
+    riskratio(
+      table(perf_demo[, "Sexo"], perf_demo_enf[, l]),
+      method = "wald",
+      rev = "b",
+      correction = FALSE
+    )
+  Edad_enf[[l]] <-
+    riskratio(
+      table(perf_demo$Edad, perf_demo_enf[, l]),
+      method = "wald",
+      rev = "c",
+      correction = FALSE
+    )
+  TipoTrab[[l]] <-
+    riskratio(
+      table(perf_demo$Ocupación, perf_demo_enf[, l]),
+      method = "wald",
+      rev = "c",
+      correction = FALSE
+    )
+  ActFis_enf[[l]] <-
+    riskratio(
+      table(perf_demo$`Act Física`, perf_demo_enf[, l]),
+      method = "wald",
+      rev = "c",
+      correction = FALSE
+    )
+  HaFum_enf[[l]] <-
+    riskratio(
+      table(perf_demo$`¿Ha fumado?`, perf_demo_enf[, l]),
+      method = "wald",
+      rev = "b",
+      correction = FALSE
+    )
+  Alcoh_enf[[l]] <-
+    riskratio(
+      table(perf_demo$`¿Consume alcohol?`, perf_demo_enf[, l]),
+      method = "wald",
+      rev = "b",
+      correction = FALSE
+    )
+}
+
+Genero_enf
+Edad_enf
+TipoTrab
+HaFum_enf
+Alcoh_enf
+ActFis_enf
+
+for (l in 1:7) {
+  Genero_enf[[l]] <-
+    oddsratio(
+      table(perf_demo[, "Sexo"], perf_demo_enf[, l]),
+      method = "wald",
+      rev = "b",
+      correction = FALSE
+    )
+  Edad_enf[[l]] <-
+    oddsratio(
+      table(perf_demo$Edad, perf_demo_enf[, l]),
+      method = "wald",
+      rev = "c",
+      correction = FALSE
+    )
+  TipoTrab[[l]] <-
+    oddsratio(
+      table(perf_demo$Ocupación, perf_demo_enf[, l]),
+      method = "wald",
+      rev = "c",
+      correction = FALSE
+    )
+  ActFis_enf[[l]] <-
+    oddsratio(
+      table(perf_demo$`Act Física`, perf_demo_enf[, l]),
+      method = "wald",
+      rev = "c",
+      correction = FALSE
+    )
+  HaFum_enf[[l]] <-
+    oddsratio(
+      table(perf_demo$`¿Ha fumado?`, perf_demo_enf[, l]),
+      method = "wald",
+      rev = "b",
+      correction = FALSE
+    )
+  Alcoh_enf[[l]] <-
+    oddsratio(
+      table(perf_demo$`¿Consume alcohol?`, perf_demo_enf[, l]),
+      method = "wald",
+      rev = "b",
+      correction = FALSE
+    )
+}
+
+Genero_enf
+Edad_enf
+TipoTrab
+HaFum_enf
+Alcoh_enf
+ActFis_enf
